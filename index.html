@@ -742,40 +742,37 @@ function resetPlayer() {
         }
 
 function loadAndPlaySong(song) {
-    if (!song) return;
-    
-    const transaction = db.transaction(['musicFiles'], 'readonly');
-    const store = transaction.objectStore('musicFiles');
-    const request = store.get(song.id);
-    
-    request.onsuccess = () => {
-        if (request.result) {
-            if (song.url) {
-                URL.revokeObjectURL(song.url);
-            }
-            song.url = URL.createObjectURL(new Blob([request.result.file]));
-            audioPlayer.src = song.url;
-            audioPlayer.currentTime = 0;
-            musicTitle.textContent = song.name;
-            musicArtist.textContent = song.artist;
-            
-            const backgroundElement = document.querySelector('.background-blur');
-            backgroundElement.classList.add('changing');
-            backgroundElement.style.backgroundImage = `url('${song.albumArt}')`;
-            albumArtImg.src = song.albumArt;
-            
-            setTimeout(() => {
-                backgroundElement.classList.remove('changing');
-            }, 500);
-            
-            currentSongId = song.id;
-            audioPlayer.play();
-            playPauseBtn.innerHTML = '<span class="material-symbols-rounded">pause</span>';
-            playPauseBtn.classList.add('playing');
-            document.querySelector('.background-blur').classList.add('rotating');
-            renderSongs();
-        }
-    };
+    if (!song || !song.url) {
+        console.error("Song or song URL is invalid:", song);
+        return;
+    }
+
+    console.log("Loading song:", song);
+
+    audioPlayer.src = song.url; // Directly use the URL from the JSON
+    audioPlayer.currentTime = 0;
+
+    musicTitle.textContent = song.name;
+    musicArtist.textContent = song.artist;
+    albumArtImg.src = song.albumArt || ""; // Use a default image if album art is missing
+
+    const backgroundElement = document.querySelector('.background-blur');
+    backgroundElement.style.backgroundImage = `url('${song.albumArt || ""}')`;
+
+    currentSongId = song.id;
+
+    audioPlayer.play()
+        .then(() => {
+            console.log("Song is playing:", song.name);
+        })
+        .catch((error) => {
+            console.error("Failed to play song:", error);
+        });
+
+    playPauseBtn.innerHTML = '<span class="material-symbols-rounded">pause</span>';
+    playPauseBtn.classList.add('playing');
+    document.querySelector('.background-blur').classList.add('rotating');
+    renderSongs();
 }
         
 function updatePageTitle() {
@@ -1060,21 +1057,21 @@ async function loadMusicFromMediaJson() {
         if (!response.ok) throw new Error('Failed to load media.json');
         
         const files = await response.json();
-        
+
         songs = files.map((file, index) => ({
             id: Date.now() + index,
             name: file.name,
             artist: file.artist || 'Unknown Artist',
             album: file.album || 'Unknown Album',
             year: file.year || '',
-            albumArt: file.albumArt || generateRandomGradient(), // Default if album art is not provided
+            albumArt: file.albumArt || generateRandomGradient(), // Default album art
             trackNumber: file.trackNumber || null,
-            url: file.url,
+            url: file.url, // Direct URL for playback
         }));
-        
+
         renderSongs();
         if (songs.length > 0) {
-            loadAndPlaySong(songs[0]);
+            loadAndPlaySong(songs[0]); // Play the first song automatically
         }
     } catch (error) {
         console.error('Error loading music:', error);
