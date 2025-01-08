@@ -568,10 +568,6 @@
             <input type="text" id="searchInput" placeholder="Search Songs" class="search-input">
         </div>
         <div class="music-list"></div>
-        <label class="upload-btn">
-            <span class="material-symbols-rounded">add</span> Add Music
-            <input type="file" accept="audio/*" style="display: none" id="musicUpload" multiple webkitdirectory>
-        </label>
     </div>
     <div class="main-content">
         <div class="album-art">
@@ -1058,72 +1054,71 @@ async function addSongs(files) {
     }
 }
 
-async function loadSongsFromStorage() {
-    const transaction = db.transaction(['songs', 'musicFiles'], 'readonly');
-    const songStore = transaction.objectStore('songs');
-    
+async function loadMusicFromMedia() {
     try {
-        const songsRequest = songStore.getAll();
-        
-        const loadedSongs = await new Promise((resolve, reject) => {
-            songsRequest.onsuccess = () => resolve(songsRequest.result);
-            songsRequest.onerror = () => reject(songsRequest.error);
-        });
-        
-        songs = loadedSongs.map(song => ({
-            ...song,
-            album: song.album || 'Unknown Album',
-            artist: song.artist || 'Unknown Artist',
-            year: song.year || '',
-            trackNumber: song.trackNumber || null
-        })).filter(song => {
-            if (song.type) {
-                const dummyFile = { type: song.type, name: song.name };
-                return isAudioFile(dummyFile);
-            }
-            return true;
-        });
-        
-        if (songs.length > 0) {
-            const firstSong = songs[0];
-            await loadSong(firstSong);
-        }
-        
+        const response = await fetch('/media');
+        const files = await response.json(); // Assuming the server returns a JSON list of file paths.
+
+        songs = await Promise.all(
+            files.map(async (filePath) => {
+                const metadata = await extractMetadata(filePath); // Modify extractMetadata to accept file paths
+                return {
+                    id: Date.now() + Math.random(),
+                    name: metadata.title,
+                    artist: metadata.artist,
+                    album: metadata.album || 'Unknown Album',
+                    year: metadata.year,
+                    albumArt: metadata.albumArt,
+                    trackNumber: metadata.trackNumber,
+                    url: `/media/${filePath}`, // Direct URL to play
+                };
+            })
+        );
+
         renderSongs();
+        if (songs.length > 0) {
+            loadAndPlaySong(songs[0]);
+        }
     } catch (error) {
-        console.error('Error loading songs:', error);
+        console.error('Error loading music from /media:', error);
     }
 }
-  
-async function saveSongs() {
-    const transaction = db.transaction(['songs'], 'readwrite');
-    const store = transaction.objectStore('songs');
 
-    return new Promise((resolve, reject) => {
-        transaction.onerror = () => reject(transaction.error);
-
-        // Clear existing songs
-        const clearRequest = store.clear();
-
-        clearRequest.onsuccess = () => {
-            // Add all songs
-            songs.forEach(song => {
-                store.add({
-                    id: song.id,
-                    name: song.name,
-                    artist: song.artist,
-                    album: song.album,
-                    year: song.year,
-                    albumArt: song.albumArt,
-                    trackNumber: song.trackNumber,
-                    type: song.type,
-                });
-            });
-        };
-
-        transaction.oncomplete = () => resolve();
-    });
+async function loadMusicFromMediaJson() {
+    try {
+        const response = await fetch('/media.json');
+        if (!response.ok) throw new Error('Failed to load media.json');
+        
+        const files = await response.json();
+        
+        songs = files.map((file, index) => ({
+            id: Date.now() + index,
+            name: file.name,
+            artist: file.artist || 'Unknown Artist',
+            album: file.album || 'Unknown Album',
+            year: file.year || '',
+            albumArt: file.albumArt || generateRandomGradient(), // Default if album art is not provided
+            trackNumber: file.trackNumber || null,
+            url: file.url,
+        }));
+        
+        renderSongs();
+        if (songs.length > 0) {
+            loadAndPlaySong(songs[0]);
+        }
+    } catch (error) {
+        console.error('Error loading music:', error);
+        document.querySelector('.music-list').innerHTML = `
+            <div class="no-results">
+                <span class="material-symbols-rounded">search_off</span>
+                <p>Failed to load music files. Please try again later.</p>
+            </div>`;
+    }
 }
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadMusicFromMediaJson();
+});
 
 function renderSongs() {
     const albums = groupSongsByAlbum(songs);
