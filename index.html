@@ -1044,7 +1044,6 @@ async function addSongs(files) {
 
         songs.push(song);
     }
-    await saveSongs();
     renderSongs();
     if (songs.length === files.length) {
         loadSong(songs[0]);
@@ -1213,30 +1212,6 @@ function attachEventListeners() {
                 el.style.display = 'none';
             });
         }
-    });
-
-    // Delete album functionality
-    document.querySelectorAll('.delete-album').forEach(button => {
-        button.addEventListener('click', async (e) => {
-            const albumName = button.dataset.album;
-
-            if (confirm(`Are you sure you want to delete the album "${albumName}"?`)) {
-                const albumSongs = songs.filter(song => song.album === albumName);
-
-                const transaction = db.transaction(['musicFiles', 'songs'], 'readwrite');
-                const fileStore = transaction.objectStore('musicFiles');
-                const songStore = transaction.objectStore('songs');
-
-                albumSongs.forEach(song => {
-                    fileStore.delete(song.id);
-                    if (song.url) URL.revokeObjectURL(song.url);
-                });
-
-                songs = songs.filter(song => song.album !== albumName);
-                await saveSongs();
-                renderSongs();
-            }
-        });
     });
 
     // Play song functionality
@@ -1666,7 +1641,6 @@ audioPlayer.addEventListener('timeupdate', async () => {
         const song = songs.find(s => s.id === currentSongId);
         if (song) {
             song.timestamp = audioPlayer.currentTime;
-            await saveSongs();
         }
         const percentage = (audioPlayer.currentTime / audioPlayer.duration) * 100;
         progress.style.width = `${percentage}%`;
