@@ -688,7 +688,7 @@ const initDB = () => {
 
         request.onsuccess = (event) => {
             db = event.target.result;
-            loadSongsFromStorage();
+            loadMusicFromMediaJson()
             resolve();
         };
     });
@@ -1051,36 +1051,6 @@ async function addSongs(files) {
     renderSongs();
     if (songs.length === files.length) {
         loadSong(songs[0]);
-    }
-}
-
-async function loadMusicFromMedia() {
-    try {
-        const response = await fetch('/media');
-        const files = await response.json(); // Assuming the server returns a JSON list of file paths.
-
-        songs = await Promise.all(
-            files.map(async (filePath) => {
-                const metadata = await extractMetadata(filePath); // Modify extractMetadata to accept file paths
-                return {
-                    id: Date.now() + Math.random(),
-                    name: metadata.title,
-                    artist: metadata.artist,
-                    album: metadata.album || 'Unknown Album',
-                    year: metadata.year,
-                    albumArt: metadata.albumArt,
-                    trackNumber: metadata.trackNumber,
-                    url: `/media/${filePath}`, // Direct URL to play
-                };
-            })
-        );
-
-        renderSongs();
-        if (songs.length > 0) {
-            loadAndPlaySong(songs[0]);
-        }
-    } catch (error) {
-        console.error('Error loading music from /media:', error);
     }
 }
 
