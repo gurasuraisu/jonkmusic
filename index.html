@@ -1660,17 +1660,6 @@ window.addEventListener("load", async () => {
         console.error('Error loading saved song:', error);
     }
 });
-        
-musicUpload.addEventListener('change', async (e) => {
-    if (e.target.files.length > 0) {
-        try {
-            await preloadSongs(e.target.files);
-            await addSongs(e.target.files); // Add this line to process the metadata
-        } catch (error) {
-            console.error('Error uploading songs:', error);
-        }
-    }
-});
 
 audioPlayer.addEventListener('timeupdate', async () => {
     if (currentSongId) {
