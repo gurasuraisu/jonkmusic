@@ -1535,11 +1535,11 @@ if ('mediaSession' in navigator) {
 
     function setupMediaSessionActions() {
         navigator.mediaSession.setActionHandler('play', () => {
-            playPauseAudio();
+            audioPlayer.play();
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
-            playPauseAudio();
+            audioPlayer.pause();
         });
 
         navigator.mediaSession.setActionHandler('previoustrack', () => {
