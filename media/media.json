@@ -2,9 +2,18 @@
   {
     "name": "sd_bbb",
     "artist": "Patricia Taxxon",
-    "album": "Tester",
+    "album": "The Best Day",
     "year": "2019",
     "trackNumber": 1,
     "url": "/streams/media/sd_bbb.flac"
+  },
+  
+  {
+    "name": "Yestalgia for Futurity",
+    "artist": "MYUKKE.",
+    "album": "Yestalgia for Futurity",
+    "year": "2023",
+    "trackNumber": 1,
+    "url": "/streams/media/Yestalgia for Futurity.flac"
   }
 ]
