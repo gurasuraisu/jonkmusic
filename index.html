@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jonk Music</title>
+    <title>Streams</title>
     <link rel="icon" href="favicon.png" type="image/png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,700,1,0">
@@ -732,7 +732,7 @@ function resetPlayer() {
     document.querySelector('.background-blur').classList.remove('rotating');
     playPauseBtn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span>';
     playPauseBtn.classList.remove('playing');
-    document.title = 'Jonk Music';
+    document.title = 'Streams';
 }
     
         function formatTime(seconds) {
@@ -783,7 +783,7 @@ function updatePageTitle() {
             document.title = `${currentTime} • ${song.name} by ${song.artist}`;
         }
     } else {
-        document.title = 'Jonk Music'; // Default title when no song is playing
+        document.title = 'Streams'; // Default title when no song is playing
     }
 }
         
