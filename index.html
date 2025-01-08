@@ -1056,7 +1056,7 @@ async function addSongs(files) {
 
 async function loadMusicFromMediaJson() {
     try {
-        const response = await fetch('/media.json');
+        const response = await fetch('/media/media.json');
         if (!response.ok) throw new Error('Failed to load media.json');
         
         const files = await response.json();
