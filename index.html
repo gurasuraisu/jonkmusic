@@ -1536,10 +1536,15 @@ if ('mediaSession' in navigator) {
     function setupMediaSessionActions() {
         navigator.mediaSession.setActionHandler('play', () => {
             audioPlayer.play();
+            playPauseBtn.innerHTML = '<span class="material-symbols-rounded">pause</span>';
+            playPauseBtn.classList.add('playing');
+            document.querySelector('.background-blur').classList.add('rotating');
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
             audioPlayer.pause();
+            playPauseBtn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span>';
+            playPauseBtn.classList.remove('playing');
         });
 
         navigator.mediaSession.setActionHandler('previoustrack', () => {
@@ -1560,6 +1565,8 @@ if ('mediaSession' in navigator) {
 
         navigator.mediaSession.setActionHandler('stop', () => {
             audioPlayer.pause();
+            playPauseBtn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span>';
+            playPauseBtn.classList.remove('playing');
             audioPlayer.currentTime = 0;
             updateMediaSessionPlaybackState('paused');
         });
