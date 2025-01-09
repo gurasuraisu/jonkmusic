@@ -661,7 +661,6 @@
         const volumeIcon = document.getElementById('volumeIcon');
         const body = document.body;
         const menuBtn = document.createElement('button');
-        const workerQueue = new Map();
         const BATCH_SIZE = 3; // Process 3 files at a time
 
         let songs = JSON.parse(localStorage.getItem('songs')) || [];
