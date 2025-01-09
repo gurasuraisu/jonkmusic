@@ -799,7 +799,6 @@ const imageWorkerBlob = new Blob([`
 `], { type: 'text/javascript' });
 
 // Create workers from Blobs
-const metadataWorker = new Worker(URL.createObjectURL(metadataWorkerBlob));
 const imageWorker = new Worker(URL.createObjectURL(imageWorkerBlob));
 
 // Clean up URLs
