@@ -5,6 +5,7 @@
     "album": "The Best Day",
     "year": "2019",
     "trackNumber": 1,
+    "quality": "Lossless"
     "url": "/streams/media/sd_bbb.flac"
   },
   
@@ -14,6 +15,7 @@
     "album": "Animal Crossing New Horizons",
     "year": "2020",
     "trackNumber": 14,
+    "quality": "Lossless"
     "url": "/streams/media/1.14 12 pm (Sunny).flac"
   },
 
@@ -23,6 +25,7 @@
     "album": "Yestalgia for Futurity",
     "year": "2023",
     "trackNumber": 1,
+    "quality": "High Quality"
     "url": "/streams/media/Yestalgia for Futurity.m4a"
   }
 ]
