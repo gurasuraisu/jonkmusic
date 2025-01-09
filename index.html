@@ -126,6 +126,7 @@
             height: 100%;
             object-fit: cover;
             border-radius: 25px;
+            background-color: #333333;
         }
 
 .music-info {
@@ -808,34 +809,30 @@ function isAudioFile(file) {
     return allowedTypes.includes(file.type) || file.name.match(allowedExtensions);
 }
         
-function generateRandomGradient() {
-    const colors = [
-        '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeead',
-        '#d4a5a5', '#9b59b6', '#3498db', '#e74c3c', '#2ecc71',
-        '#f1c40f', '#1abc9c', '#e67e22', '#7f8c8d', '#2c3e50'
-    ];
-    
-    const color1 = colors[Math.floor(Math.random() * colors.length)];
-    let color2;
-    do {
-        color2 = colors[Math.floor(Math.random() * colors.length)];
-    } while (color1 === color2);
-    
-    const angle = Math.floor(Math.random() * 360);
-    
+function generateDefaultAlbumArt(songName, artistName) {
     const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
     canvas.width = 500;
     canvas.height = 500;
-    const ctx = canvas.getContext('2d');
     
+    // Create gradient background
     const gradient = ctx.createLinearGradient(0, 0, 500, 500);
-    gradient.addColorStop(0, color1);
-    gradient.addColorStop(1, color2);
+    gradient.addColorStop(0, '#666666');
+    gradient.addColorStop(1, '#333333');
     
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 500, 500);
     
-    return canvas.toDataURL('image/jpeg', 0.9);
+    // Add text
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 40px Inter';
+    ctx.fillText(songName, 250, 230);
+    
+    ctx.font = '30px Inter';
+    ctx.fillText(artistName, 250, 280);
+    
+    return canvas.toDataURL('image/jpeg', 0.8);
 }
         
 async function preloadSongs(files) {
@@ -903,43 +900,6 @@ async function preloadSongs(files) {
     }
     
     console.log('All songs processed and stored successfully');
-}
-
-async function loadSong(song) {
-    const transaction = db.transaction(['musicFiles'], 'readonly');
-    const store = transaction.objectStore('musicFiles');
-    const request = store.get(song.id);
-    document.title = `${song.name} by ${song.artist}`;
-    
-    request.onsuccess = (event) => {
-        if (request.result && request.result.file) {
-            // Check if it's a valid audio file
-            if (!isAudioFile(request.result.file)) {
-                console.error('Invalid audio file type');
-                playNextSong(); // Skip to next song
-                return;
-            }
-
-            // Continue with loading the song
-            song.url = URL.createObjectURL(request.result.file);
-            audioPlayer.src = song.url;
-            audioPlayer.currentTime = 0;
-            musicTitle.textContent = song.name;
-            musicArtist.textContent = song.artist;
-
-            const backgroundElement = document.querySelector('.background-blur');
-            backgroundElement.classList.add('changing');
-            backgroundElement.style.backgroundImage = `url('${song.albumArt}')`;
-            albumArtImg.src = song.albumArt;
-
-            setTimeout(() => {
-                backgroundElement.classList.remove('changing');
-            }, 500);
-
-            currentSongId = song.id;
-            playPauseBtn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span>';
-        }
-    };
 }
         
 async function extractMetadata(file) {
@@ -1058,22 +1018,52 @@ async function loadMusicFromMediaJson() {
         const response = await fetch('/streams/media/media.json');
         if (!response.ok) throw new Error('Failed to load media.json');
         
-        const files = await response.json();
+        const data = await response.json();
+        const files = Array.isArray(data) ? data : data.songs;
 
-        songs = files.map((file, index) => ({
-            id: Date.now() + index,
-            name: file.name,
-            artist: file.artist || 'Unknown Artist',
-            album: file.album || 'Unknown Album',
-            year: file.year || '',
-            albumArt: file.albumArt || generateRandomGradient(), // Default album art
-            trackNumber: file.trackNumber || null,
-            url: file.url, // Direct URL for playback
+        songs = files.map((file, index) => {
+            // Check if album art URL exists and is valid
+            let albumArt = file.albumArt;
+            if (!albumArt || albumArt === '') {
+                // Generate default album art if none provided
+                albumArt = generateDefaultAlbumArt(file.name, file.artist);
+            } else {
+                // Ensure the album art path is absolute
+                if (!albumArt.startsWith('http') && !albumArt.startsWith('/')) {
+                    albumArt = '/streams/media/artwork/' + albumArt;
+                }
+            }
+
+            return {
+                id: Date.now() + index,
+                name: file.name || 'Unknown Track',
+                artist: file.artist || 'Unknown Artist',
+                album: file.album || 'Unknown Album',
+                url: file.url,
+                albumArt: albumArt
+            };
+        });
+
+        // Preload album art images
+        await Promise.all(songs.map(song => {
+            if (song.albumArt.startsWith('http') || song.albumArt.startsWith('/')) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => resolve();
+                    img.onerror = () => {
+                        // If loading fails, use generated default
+                        song.albumArt = generateDefaultAlbumArt(song.name, song.artist);
+                        resolve();
+                    };
+                    img.src = song.albumArt;
+                });
+            }
+            return Promise.resolve();
         }));
 
         renderSongs();
         if (songs.length > 0) {
-            loadAndPlaySong(songs[0]); // Play the first song automatically
+            loadAndPlaySong(songs[0]);
         }
     } catch (error) {
         console.error('Error loading music:', error);
@@ -1084,7 +1074,7 @@ async function loadMusicFromMediaJson() {
             </div>`;
     }
 }
-
+        
 document.addEventListener('DOMContentLoaded', async () => {
     await loadMusicFromMediaJson();
 });
