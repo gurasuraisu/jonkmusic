@@ -965,7 +965,7 @@ async function extractMetadata(file) {
         new jsmediatags.Reader(file)
             .setTagsToRead(['title', 'artist', 'album', 'year', 'picture', 'track'])
             .read({
-                onSuccess: async function(tag) {  // Mark this callback as async
+                onSuccess: async function(tag) {
                     let albumArt;
                     if (tag.tags.picture) {
                         const { data, format } = tag.tags.picture;
@@ -980,6 +980,11 @@ async function extractMetadata(file) {
                         
                         await new Promise(resolve => {
                             tempImage.onload = () => {
+                                // Fill background with black to prevent transparency issues
+                                ctx.fillStyle = '#000000';
+                                ctx.fillRect(0, 0, 500, 500);
+
+                                // Calculate dimensions to maintain aspect ratio
                                 const aspectRatio = tempImage.width / tempImage.height;
                                 let drawWidth = 500;
                                 let drawHeight = 500;
@@ -994,23 +999,22 @@ async function extractMetadata(file) {
                                     offsetX = (500 - drawWidth) / 2;
                                 }
                                 
-                                ctx.fillStyle = '#000000';
-                                ctx.fillRect(0, 0, 500, 500);
                                 ctx.drawImage(tempImage, offsetX, offsetY, drawWidth, drawHeight);
                                 resolve();
                             };
                         });
                         
-                        albumArt = canvas.toDataURL('image/jpeg', 0.9);
+                        // Convert to WebP
+                        albumArt = canvas.toDataURL('image/webp', 0.8); // 0.8 is the quality parameter (0-1)
                     } else {
                         albumArt = generateRandomGradient();
                     }
                     
                     let trackNumber = null;
                     if (tag.tags.track) {
-                            trackNumber = typeof tag.tags.track === 'string' 
-                                ? parseInt(tag.tags.track.split('/')[0]) 
-                                : parseInt(tag.tags.track) || null;
+                        trackNumber = typeof tag.tags.track === 'string' 
+                            ? parseInt(tag.tags.track.split('/')[0]) 
+                            : parseInt(tag.tags.track) || null;
                     }
                     
                     resolve({
