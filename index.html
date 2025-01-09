@@ -967,48 +967,47 @@ async function extractMetadata(file) {
             .read({
                 onSuccess: async function(tag) {
                     let albumArt;
-                    if (tag.tags.picture) {
-                        const { data, format } = tag.tags.picture;
-                        const base64String = data.reduce((acc, curr) => acc + String.fromCharCode(curr), '');
-                        const tempImage = new Image();
-                        tempImage.src = `data:${format};base64,${btoa(base64String)}`;
-                        
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        canvas.width = 500;
-                        canvas.height = 500;
-                        
-                        await new Promise(resolve => {
-                            tempImage.onload = () => {
-                                // Fill background with black to prevent transparency issues
-                                ctx.fillStyle = '#000000';
-                                ctx.fillRect(0, 0, 500, 500);
+if (tag.tags.picture) {
+    const { data, format } = tag.tags.picture;
+    const base64String = data.reduce((acc, curr) => acc + String.fromCharCode(curr), '');
+    const tempImage = new Image();
+    tempImage.src = `data:${format};base64,${btoa(base64String)}`;
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 500;
+    canvas.height = 500;
+    
+    await new Promise(resolve => {
+        tempImage.onload = () => {
+            // Fill background with black to prevent transparency issues
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 500, 500);
 
-                                // Calculate dimensions to maintain aspect ratio
-                                const aspectRatio = tempImage.width / tempImage.height;
-                                let drawWidth = 500;
-                                let drawHeight = 500;
-                                let offsetX = 0;
-                                let offsetY = 0;
-                                
-                                if (aspectRatio > 1) {
-                                    drawHeight = 500 / aspectRatio;
-                                    offsetY = (500 - drawHeight) / 2;
-                                } else {
-                                    drawWidth = 500 * aspectRatio;
-                                    offsetX = (500 - drawWidth) / 2;
-                                }
-                                
-                                ctx.drawImage(tempImage, offsetX, offsetY, drawWidth, drawHeight);
-                                resolve();
-                            };
-                        });
-                        
-                        // Convert to WebP
-                        albumArt = canvas.toDataURL('image/webp', 0.8); // 0.8 is the quality parameter (0-1)
-                    } else {
-                        albumArt = generateRandomGradient();
-                    }
+            // Calculate dimensions to maintain aspect ratio
+            const aspectRatio = tempImage.width / tempImage.height;
+            let drawWidth = 500;
+            let drawHeight = 500;
+            let offsetX = 0;
+            let offsetY = 0;
+            
+            if (aspectRatio > 1) {
+                drawHeight = 500 / aspectRatio;
+                offsetY = (500 - drawHeight) / 2;
+            } else {
+                drawWidth = 500 * aspectRatio;
+                offsetX = (500 - drawWidth) / 2;
+            }
+            
+            ctx.drawImage(tempImage, offsetX, offsetY, drawWidth, drawHeight);
+            resolve();
+        };
+    });
+    
+    // Convert to WebP
+    albumArt = canvas.toDataURL('image/webp', 0.8); // 0.8 is the quality parameter (0-1)
+}
+
                     
                     let trackNumber = null;
                     if (tag.tags.track) {
@@ -1037,6 +1036,41 @@ async function extractMetadata(file) {
                     });
                 }
             });
+    });
+}
+
+function createThumbnail(sourceImage, size = 60) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = size;
+    canvas.height = size;
+    
+    // Fill background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, size, size);
+    
+    const img = new Image();
+    img.src = sourceImage;
+    
+    return new Promise(resolve => {
+        img.onload = () => {
+            const aspectRatio = img.width / img.height;
+            let drawWidth = size;
+            let drawHeight = size;
+            let offsetX = 0;
+            let offsetY = 0;
+            
+            if (aspectRatio > 1) {
+                drawHeight = size / aspectRatio;
+                offsetY = (size - drawHeight) / 2;
+            } else {
+                drawWidth = size * aspectRatio;
+                offsetX = (size - drawWidth) / 2;
+            }
+            
+            ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+            resolve(canvas.toDataURL('image/webp', 0.6));
+        };
     });
 }
         
@@ -1158,7 +1192,7 @@ function renderSongs() {
     musicList.innerHTML = albums.map(album => `
         <div class="album-section">
             <div class="album-header">
-                <img src="${album.albumArt}" alt="${album.name}" class="album-thumbnail">
+                <img src="${album.thumbnail}" alt="${album.name}" class="album-thumbnail">
                 <div class="album-info">
                     <div class="album-name">${album.name}</div>
                     <div class="album-artist">${album.artist}</div>
@@ -1507,26 +1541,32 @@ function showNoSongPlayingScreen() {
     currentSongId = null;
 }
         
-function groupSongsByAlbum(songs) {
+async function groupSongsByAlbum(songs) {
     const albums = {};
-    songs.forEach(song => {
+    for (const song of songs) {
         const albumName = song.album || 'Unknown Album';
         if (!albums[albumName]) {
+            const thumbnail = await createThumbnail(song.albumArt);
             albums[albumName] = {
                 name: albumName,
                 artist: song.artist,
                 year: song.year,
                 albumArt: song.albumArt,
+                thumbnail: thumbnail,
                 songs: [],
                 dateAdded: song.dateAdded
             };
         }
         albums[albumName].songs.push(song);
-    });
+    }
 
     // Sort songs within each album by track number first, then by name
-    for (let albumName in albums) {
-        albums[albumName].songs.sort((a, b) => {
+    const sortedAlbums = {};
+    await Promise.all(Object.keys(albums).map(async (albumName) => {
+        const album = albums[albumName];
+        
+        // Sort songs array
+        album.songs.sort((a, b) => {
             if (a.trackNumber && b.trackNumber) {
                 return a.trackNumber - b.trackNumber;
             }
@@ -1534,9 +1574,12 @@ function groupSongsByAlbum(songs) {
             if (b.trackNumber) return 1;
             return a.name.localeCompare(b.name);
         });
-    }
+        
+        sortedAlbums[albumName] = album;
+    }));
 
-    return Object.values(albums).sort((a, b) => b.dateAdded - a.dateAdded);
+    // Convert to array and sort by dateAdded
+    return Object.values(sortedAlbums).sort((a, b) => b.dateAdded - a.dateAdded);
 }
 
 if ('mediaSession' in navigator) {
