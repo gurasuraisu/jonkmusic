@@ -661,6 +661,8 @@
         const volumeIcon = document.getElementById('volumeIcon');
         const body = document.body;
         const menuBtn = document.createElement('button');
+        const workerQueue = new Map();
+        const BATCH_SIZE = 3; // Process 3 files at a time
 
         let songs = JSON.parse(localStorage.getItem('songs')) || [];
         let currentSongId = null;
@@ -670,6 +672,8 @@
         let playQueue = [];
         let currentQueueIndex = -1;
         let searchTimeout;
+        let metadataWorker;
+        let isProcessing = false;
 
 menuBtn.className = 'menu-btn';
 menuBtn.innerHTML = '<span class="material-symbols-rounded">menu</span>';
@@ -689,6 +693,196 @@ overlay.addEventListener('click', () => {
     document.querySelector('.sidebar').classList.remove('open');
     overlay.classList.remove('active');
 });
+
+// Create inline workers using Blobs
+const metadataWorkerBlob = new Blob([`
+    importScripts('https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js');
+
+    self.onmessage = async function(e) {
+        const { file, id } = e.data;
+        
+        try {
+            const metadata = await extractMetadata(file);
+            self.postMessage({
+                success: true,
+                id: id,
+                metadata: metadata
+            });
+        } catch (error) {
+            self.postMessage({
+                success: false,
+                id: id,
+                error: error.message
+            });
+        }
+    };
+
+    function extractMetadata(file) {
+        return new Promise((resolve, reject) => {
+            new jsmediatags.Reader(file)
+                .setTagsToRead(['title', 'artist', 'album', 'year', 'picture', 'track'])
+                .read({
+                    onSuccess: async function(tag) {
+                        let albumArt = null;
+                        
+                        if (tag.tags.picture) {
+                            const { data, format } = tag.tags.picture;
+                            const base64String = data.reduce((acc, curr) => acc + String.fromCharCode(curr), '');
+                            albumArt = \`data:\${format};base64,\${btoa(base64String)}\`;
+                        }
+                        
+                        resolve({
+                            title: tag.tags.title || file.name.replace(/\\.[^/.]+$/, ""),
+                            artist: tag.tags.artist || 'Unknown Artist',
+                            album: tag.tags.album || 'Unknown Album',
+                            year: tag.tags.year || '',
+                            albumArt: albumArt,
+                            trackNumber: tag.tags.track ? parseInt(tag.tags.track) : null
+                        });
+                    },
+                    onError: reject
+                });
+        });
+    }
+`], { type: 'text/javascript' });
+
+const imageWorkerBlob = new Blob([`
+    self.onmessage = async function(e) {
+        const { imageData, size } = e.data;
+        
+        try {
+            const response = await fetch(imageData);
+            const blob = await response.blob();
+            const bitmap = await createImageBitmap(blob);
+            
+            const canvas = new OffscreenCanvas(size, size);
+            const ctx = canvas.getContext('2d');
+            
+            const aspectRatio = bitmap.width / bitmap.height;
+            let drawWidth = size;
+            let drawHeight = size;
+            let offsetX = 0;
+            let offsetY = 0;
+            
+            if (aspectRatio > 1) {
+                drawHeight = size / aspectRatio;
+                offsetY = (size - drawHeight) / 2;
+            } else {
+                drawWidth = size * aspectRatio;
+                offsetX = (size - drawWidth) / 2;
+            }
+            
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, size, size);
+            ctx.drawImage(bitmap, offsetX, offsetY, drawWidth, drawHeight);
+            
+            const blob = await canvas.convertToBlob({
+                type: 'image/webp',
+                quality: 0.8
+            });
+            
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = function() {
+                self.postMessage({
+                    success: true,
+                    imageData: reader.result
+                });
+            };
+        } catch (error) {
+            self.postMessage({
+                success: false,
+                error: error.message
+            });
+        }
+    };
+`], { type: 'text/javascript' });
+
+// Create workers from Blobs
+const metadataWorker = new Worker(URL.createObjectURL(metadataWorkerBlob));
+const imageWorker = new Worker(URL.createObjectURL(imageWorkerBlob));
+
+// Clean up URLs
+URL.revokeObjectURL(metadataWorkerBlob);
+URL.revokeObjectURL(imageWorkerBlob);
+
+// Rest of the code remains the same as in the previous solution
+const workerQueue = new Map();
+const BATCH_SIZE = 3;
+
+metadataWorker.onmessage = handleWorkerMessage;
+
+async function processFiles(files) {
+    const batches = [];
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+        batches.push(files.slice(i, i + BATCH_SIZE));
+    }
+    
+    for (const batch of batches) {
+        await processBatch(batch);
+    }
+}
+
+function processBatch(files) {
+    return new Promise((resolve) => {
+        const promises = files.map(file => {
+            return new Promise((resolveFile) => {
+                const id = Date.now() + Math.random();
+                workerQueue.set(id, resolveFile);
+                metadataWorker.postMessage({ file, id });
+            });
+        });
+        
+        Promise.all(promises).then(resolve);
+    });
+}
+
+async function handleWorkerMessage(e) {
+    const { success, id, metadata, error } = e.data;
+    const resolve = workerQueue.get(id);
+    
+    if (success) {
+        const song = {
+            id: id,
+            name: metadata.title,
+            artist: metadata.artist,
+            album: metadata.album,
+            year: metadata.year,
+            albumArt: metadata.albumArt,
+            trackNumber: metadata.trackNumber,
+            dateAdded: Date.now()
+        };
+        
+        if (metadata.albumArt) {
+            song.albumArt = await processAlbumArt(metadata.albumArt);
+        }
+        
+        songs.push(song);
+    } else {
+        console.error('Metadata extraction failed:', error);
+    }
+    
+    workerQueue.delete(id);
+    resolve();
+}
+
+async function processAlbumArt(imageData) {
+    return new Promise((resolve) => {
+        imageWorker.onmessage = (e) => {
+            if (e.data.success) {
+                resolve(e.data.imageData);
+            } else {
+                console.error('Image processing failed:', e.data.error);
+                resolve(imageData);
+            }
+        };
+        
+        imageWorker.postMessage({
+            imageData: imageData,
+            size: 500
+        });
+    });
+}
         
 const initDB = () => {
     return new Promise((resolve, reject) => {
@@ -1041,40 +1235,8 @@ async function extractMetadata(file) {
 }
         
 async function addSongs(files) {
-    for (let file of files) {
-        // Skip non-audio files
-        if (!isAudioFile(file)) {
-            console.log(`Skipping non-audio file: ${file.name}`);
-            continue;
-        }
-
-        // Extract metadata without consuming the file
-        const metadata = await extractMetadata(file);
-        const timestamp = Date.now();
-
-        const song = {
-            id: timestamp + Math.random(),
-            name: metadata.title,
-            artist: metadata.artist,
-            album: metadata.album || 'Unknown Album',
-            year: metadata.year,
-            albumArt: metadata.albumArt,
-            trackNumber: metadata.trackNumber,
-            type: file.type,
-            dateAdded: timestamp
-        };
-
-        // Store the song file in IndexedDB
-        const transaction = db.transaction(['musicFiles'], 'readwrite');
-        const store = transaction.objectStore('musicFiles');
-        store.put({ id: song.id, file }); 
-
-        songs.push(song);
-    }
+    await processFiles(Array.from(files));
     renderSongs();
-    if (songs.length === files.length) {
-        loadSong(songs[0]);
-    }
 }
 
 async function loadMusicFromMediaJson() {
