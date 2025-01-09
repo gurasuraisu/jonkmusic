@@ -1,20 +1,12 @@
 [
   {
     "name": "sd_bbb",
-    "artist": "Patricia Taxxon",
-    "album": "The Best Day",
-    "year": "2019",
-    "trackNumber": 1,
     "quality": "Lossless"
     "url": "/streams/media/sd_bbb.flac"
   },
 
   {
     "name": "Yestalgia for Futurity",
-    "artist": "MYUKKE.",
-    "album": "Yestalgia for Futurity",
-    "year": "2023",
-    "trackNumber": 1,
     "quality": "High Quality"
     "url": "/streams/media/Yestalgia for Futurity.m4a"
   }
