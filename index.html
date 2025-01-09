@@ -742,36 +742,39 @@ function resetPlayer() {
         }
 
 function loadAndPlaySong(song) {
-    if (!song || !song.url) {
-        console.error("Song or song URL is invalid:", song);
+    if (!song) {
+        console.error("Invalid song object");
         return;
     }
 
-    console.log("Loading song:", song);
-
-    audioPlayer.src = song.url; // Directly use the URL from the JSON
+    // Set the audio source
+    audioPlayer.src = song.url;
     audioPlayer.currentTime = 0;
 
+    // Update UI elements
     musicTitle.textContent = song.name;
     musicArtist.textContent = song.artist;
-    albumArtImg.src = song.albumArt || ""; // Use a default image if album art is missing
+    albumArtImg.src = song.albumArt || "";
 
+    // Update background
     const backgroundElement = document.querySelector('.background-blur');
-    backgroundElement.style.backgroundImage = `url('${song.albumArt || ""}')`;
+    backgroundElement.classList.add('changing');
+    backgroundElement.style.backgroundImage = `url('${song.albumArt || ""}')`; 
 
+    setTimeout(() => {
+        backgroundElement.classList.remove('changing');
+    }, 500);
+
+    // Update player state
     currentSongId = song.id;
-
-    audioPlayer.play()
-        .then(() => {
-            console.log("Song is playing:", song.name);
-        })
-        .catch((error) => {
-            console.error("Failed to play song:", error);
-        });
-
     playPauseBtn.innerHTML = '<span class="material-symbols-rounded">pause</span>';
     playPauseBtn.classList.add('playing');
     document.querySelector('.background-blur').classList.add('rotating');
+
+    // Play the audio
+    audioPlayer.play()
+        .catch(error => console.error("Error playing audio:", error));
+
     renderSongs();
 }
         
@@ -1197,56 +1200,19 @@ function renderSongs(filteredSongs = null) {
 }
         
 function attachEventListeners() {
-    // Toggle album actions visibility with Shift key
-    document.addEventListener('keydown', (e) => {
-        if (e.shiftKey) {
-            document.querySelectorAll('.album-actions').forEach(el => {
-                el.style.display = 'block';
-            });
-        }
-    });
-
-    document.addEventListener('keyup', (e) => {
-        if (!e.shiftKey) {
-            document.querySelectorAll('.album-actions').forEach(el => {
-                el.style.display = 'none';
-            });
-        }
-    });
-
     // Play song functionality
-document.querySelectorAll('.music-item').forEach(item => {
-    item.addEventListener('click', async () => {
-        const songId = parseFloat(item.dataset.id);
-        const song = songs.find(s => s.id === songId);
-        
-        if (song) {
-            currentSongId = song.id;
-            updatePlayQueue(); // Update queue when selecting a new song
+    document.querySelectorAll('.music-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const songId = parseFloat(item.dataset.id);
+            const song = songs.find(s => s.id === songId);
             
-            // Load song from IndexedDB and play it
-            const transaction = db.transaction(['musicFiles'], 'readonly');
-            const store = transaction.objectStore('musicFiles');
-            const request = store.get(songId);
-            
-            request.onsuccess = () => {
-                if (request.result) {
-                    song.url = URL.createObjectURL(request.result.file);
-                    loadSong(song);
-                    audioPlayer.play();
-                    playPauseBtn.innerHTML = '<span class="material-symbols-rounded">pause</span>';
-                    playPauseBtn.classList.add('playing');
-                    document.querySelector('.background-blur').classList.add('rotating');
-                    renderSongs();
-                }
-            };
-            
-            request.onerror = () => {
-                console.error(`Failed to load song with ID: ${songId}`);
-            };
-        }
+            if (song) {
+                currentSongId = song.id;
+                updatePlayQueue();
+                loadAndPlaySong(song);
+            }
+        });
     });
-});
 }
  
 function loadSong(song) {
