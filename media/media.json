@@ -1,13 +1,11 @@
 [
   {
     "name": "sd_bbb",
-    "quality": "Lossless",
     "url": "/streams/media/sd_bbb.flac"
   },
 
   {
     "name": "Yestalgia for Futurity",
-    "quality": "High Quality",
     "url": "/streams/media/Yestalgia for Futurity.m4a"
   }
 ]
