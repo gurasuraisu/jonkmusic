@@ -1018,47 +1018,41 @@ async function loadMusicFromMediaJson() {
         const response = await fetch('/streams/media/media.json');
         if (!response.ok) throw new Error('Failed to load media.json');
         
-        const data = await response.json();
-        const files = Array.isArray(data) ? data : data.songs;
+        const files = await response.json();
 
-        songs = files.map((file, index) => {
-            // Check if album art URL exists and is valid
-            let albumArt = file.albumArt;
-            if (!albumArt || albumArt === '') {
-                // Generate default album art if none provided
-                albumArt = generateDefaultAlbumArt(file.name, file.artist);
-            } else {
-                // Ensure the album art path is absolute
-                if (!albumArt.startsWith('http') && !albumArt.startsWith('/')) {
-                    albumArt = '/streams/media/artwork/' + albumArt;
-                }
+        songs = await Promise.all(files.map(async (file, index) => {
+            try {
+                // Fetch the audio file
+                const audioResponse = await fetch(file.url);
+                const audioBlob = await audioResponse.blob();
+                audioBlob.name = file.name; // Add name property for extractMetadata
+                
+                // Extract metadata using your existing function
+                const metadata = await extractMetadata(audioBlob);
+
+                return {
+                    id: Date.now() + index,
+                    name: metadata.title,
+                    artist: metadata.artist,
+                    album: metadata.album,
+                    year: metadata.year,
+                    url: file.url,
+                    albumArt: metadata.albumArt,
+                    trackNumber: metadata.trackNumber
+                };
+            } catch (error) {
+                console.error(`Error processing file ${file.name}:`, error);
+                return {
+                    id: Date.now() + index,
+                    name: file.name,
+                    artist: 'Unknown Artist',
+                    album: 'Unknown Album',
+                    year: '',
+                    url: file.url,
+                    albumArt: generateRandomGradient(),
+                    trackNumber: null
+                };
             }
-
-            return {
-                id: Date.now() + index,
-                name: file.name || 'Unknown Track',
-                artist: file.artist || 'Unknown Artist',
-                album: file.album || 'Unknown Album',
-                url: file.url,
-                albumArt: albumArt
-            };
-        });
-
-        // Preload album art images
-        await Promise.all(songs.map(song => {
-            if (song.albumArt.startsWith('http') || song.albumArt.startsWith('/')) {
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => resolve();
-                    img.onerror = () => {
-                        // If loading fails, use generated default
-                        song.albumArt = generateDefaultAlbumArt(song.name, song.artist);
-                        resolve();
-                    };
-                    img.src = song.albumArt;
-                });
-            }
-            return Promise.resolve();
         }));
 
         renderSongs();
