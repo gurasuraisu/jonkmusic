@@ -1008,7 +1008,9 @@ async function extractMetadata(file) {
                     
                     let trackNumber = null;
                     if (tag.tags.track) {
-                        trackNumber = parseInt(tag.tags.track.split('/')[0]) || null;
+                            trackNumber = typeof tag.tags.track === 'string' 
+                                ? parseInt(tag.tags.track.split('/')[0]) 
+                                : parseInt(tag.tags.track) || null;
                     }
                     
                     resolve({
