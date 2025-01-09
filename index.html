@@ -498,6 +498,32 @@
 .no-results p {
     font-size: 14px;
 }
+
+.quality-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+    margin-top: 5px;
+    background: rgba(102, 102, 102, .4);
+    color: white;
+}
+
+.quality-lossless {
+    background: rgba(189, 214, 255, .2);
+    color: #bdd6ff;
+}
+
+.quality-enhanced {
+    background: rgba(144, 238, 144, .2);
+    color: #90ee90;
+}
+
+.quality-normal {
+    background: rgba(255, 255, 255, .2);
+    color: #ffffff;
+}
         
 @media (max-width: 768px) {
     .sidebar {
@@ -577,6 +603,7 @@
         <div class="music-info">
             <div class="music-title">No track selected</div>
             <div class="music-artist">-</div>
+            <div class="quality-badge">-</div>
             <div class="music-album"></div>
         </div>
 <div class="player-controls">
@@ -757,6 +784,12 @@ function loadAndPlaySong(song) {
     musicArtist.textContent = song.artist;
     albumArtImg.src = song.albumArt || "";
 
+    // Update quality badge
+    const qualityBadge = document.querySelector('.quality-badge');
+    const quality = determineAudioQuality({ name: song.url });
+    qualityBadge.textContent = quality.label;
+    qualityBadge.className = `quality-badge ${quality.class}`;
+
     // Update background
     const backgroundElement = document.querySelector('.background-blur');
     backgroundElement.classList.add('changing');
@@ -807,6 +840,29 @@ function isAudioFile(file) {
     const allowedExtensions = /\.(mp3|wav|flac|ogg|opus|m4a|aac)$/i;
     
     return allowedTypes.includes(file.type) || file.name.match(allowedExtensions);
+}
+
+function determineAudioQuality(file) {
+    const losslessFormats = ['audio/flac', 'audio/x-flac', 'audio/alac', 'audio/wav'];
+    const enhancedFormats = ['audio/aac', 'audio/mp4', 'audio/m4a'];
+    
+    // Check file type
+    if (losslessFormats.includes(file.type) || file.name.match(/\.(flac|wav)$/i)) {
+        return {
+            label: 'Lossless',
+            class: 'quality-lossless'
+        };
+    } else if (enhancedFormats.includes(file.type) || file.name.match(/\.(m4a|aac)$/i)) {
+        return {
+            label: 'Enhanced',
+            class: 'quality-enhanced'
+        };
+    } else {
+        return {
+            label: 'Normal',
+            class: 'quality-normal'
+        };
+    }
 }
         
 function generateDefaultAlbumArt(songName, artistName) {
